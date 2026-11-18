@@ -35,10 +35,12 @@ static class Logo
     }
 
     // Shared neutral used by the app background, so the icon matches the window.
-    public static readonly Color Tile = Hsl(220, 0.14, 0.14);
+    public static readonly Color Tile = Hsl(214, 0.14, 0.14);
 
-    // Dark rounded tile, glowing hue ring, white crosshair in the middle.
-    public static void Draw(Graphics g, RectangleF bounds)
+    public static void Draw(Graphics g, RectangleF bounds) { Draw(g, bounds, Tile); }
+
+    // Dark rounded tile, hue ring, white crosshair in the middle.
+    public static void Draw(Graphics g, RectangleF bounds, Color Tile)
     {
         var oldSmooth = g.SmoothingMode;
         g.SmoothingMode = SmoothingMode.AntiAlias;
@@ -80,13 +82,15 @@ static class Logo
         g.SmoothingMode = oldSmooth;
     }
 
-    public static Bitmap Render(int size)
+    public static Bitmap Render(int size) { return Render(size, Tile); }
+
+    public static Bitmap Render(int size, Color tile)
     {
         var bmp = new Bitmap(size, size, PixelFormat.Format32bppArgb);
         using (var g = Graphics.FromImage(bmp))
         {
             g.Clear(Color.Transparent);
-            Draw(g, new RectangleF(0, 0, size, size));
+            Draw(g, new RectangleF(0, 0, size, size), tile);
         }
         return bmp;
     }

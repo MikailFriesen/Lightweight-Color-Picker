@@ -24,6 +24,7 @@ static class Native
     [DllImport("user32.dll")] public static extern bool UnregisterHotKey(IntPtr hWnd, int id);
     [DllImport("user32.dll")] public static extern bool SetLayeredWindowAttributes(IntPtr hwnd, uint key, byte alpha, uint flags);
     [DllImport("user32.dll")] public static extern bool SetWindowDisplayAffinity(IntPtr hwnd, uint affinity);
+    [DllImport("user32.dll")] public static extern bool DestroyIcon(IntPtr hIcon);
     [DllImport("dwmapi.dll")] public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
 
     [StructLayout(LayoutKind.Sequential)] public struct POINT { public int X, Y; }
@@ -40,25 +41,44 @@ static class Native
 
 static class Theme
 {
-    // One system: every neutral shares hue 220 / saturation 14% and only steps in lightness;
-    // every color shares saturation 70% / lightness 62% (same as the logo's ring) and only changes hue.
-    const double NH = 220, NS = 0.14, CS = 0.70, CL = 0.62;
-    static Color N(double l) { return Logo.Hsl(NH, NS, l); }
-    static Color C(double h) { return Logo.Hsl(h, CS, CL); }
+    // One system, driven by a single hue (the last picked color's hue):
+    // neutrals = that hue at 14% saturation, stepping only in lightness;
+    // accent   = that hue at 70% saturation / 62% lightness (same as the logo's ring).
+    // Sat scales both saturations: a gray pick gives a gray app, a vivid pick a fully tinted one.
+    const double NS = 0.14, CS = 0.70, CL = 0.62;
+    public const double DefaultHue = 214;
+    public static double Hue, Sat;
 
-    public static readonly Color Bg       = N(0.10);
-    public static readonly Color Panel    = Logo.Tile;  // 0.14, also the logo tile
-    public static readonly Color Hover    = N(0.19);
-    public static readonly Color Border   = N(0.24);
-    public static readonly Color Muted    = N(0.60);
-    public static readonly Color Text     = N(0.92);
+    public static Color Bg, Panel, Hover, Border, Muted, Text, Accent, AccentHi;
 
-    public static readonly Color Accent   = C(214);
-    public static readonly Color AccentHi = Logo.Hsl(214, CS, 0.70);
-    public static readonly Color R        = C(0);
-    public static readonly Color G        = Logo.Hsl(135, 0.50, 0.55); // green reads brighter, so it's toned down to match R and B
-    public static readonly Color B        = Accent;    // blue channel = the accent
-    public static readonly Color Ok       = G;         // "copied" uses the same green
+    // R/G/B labels keep fixed hues because they mean the channels, not the theme.
+    public static readonly Color R  = Logo.Hsl(0, CS, CL);
+    public static readonly Color G  = Logo.Hsl(135, 0.50, 0.55); // green reads brighter, so it's toned down to match R and B
+    public static readonly Color B  = Logo.Hsl(214, CS, CL);
+    public static readonly Color Ok = G;                          // "copied" uses the same green
+
+    static Theme() { Apply(DefaultHue, 1); }
+
+    public static void Apply(double hue, double sat)
+    {
+        Hue = hue; Sat = sat;
+        Func<double, Color> n = l => Logo.Hsl(hue, NS * sat, l);
+        Bg = n(0.10); Panel = n(0.14); Hover = n(0.19); Border = n(0.24); Muted = n(0.60); Text = n(0.92);
+        // yellows/greens look brighter than reds/blues at the same lightness, so pull them down a little
+        double d = ((hue - 100 + 540) % 360) - 180;
+        double bump = Math.Max(0, Math.Cos(d * Math.PI / 140));
+        double aS = CS * sat * (1 - 0.25 * bump), aL = CL - 0.09 * bump;
+        Accent = Logo.Hsl(hue, aS, aL);
+        AccentHi = Logo.Hsl(hue, aS, aL + 0.08);
+    }
+
+    // How strongly a color should tint the app: grays, near-black and near-white -> 0, vivid -> 1.
+    public static double TintOf(Color c)
+    {
+        float s = c.GetSaturation(), l = c.GetBrightness();
+        if (l < 0.06f || l > 0.96f) return 0;
+        return Math.Min(1.0, s / 0.4);
+    }
 
     public static string Hex(Color c) { return string.Format("#{0:X2}{1:X2}{2:X2}", c.R, c.G, c.B); }
     public static bool IsLight(Color c) { return (c.R * 299 + c.G * 587 + c.B * 114) / 1000 > 150; }
@@ -147,7 +167,7 @@ class Swatch : Painted
 class FormatRow : Painted
 {
     public string Label;
-    public Color LabelColor = Theme.Muted;
+    public Color LabelColor = Color.Empty; // empty = follow the theme
     public bool Auto;
     public readonly TextBox Box;
     public event EventHandler CopyClick, AutoClick;
@@ -155,7 +175,7 @@ class FormatRow : Painted
     readonly Timer reset = new Timer { Interval = 1200 };
 
     Rectangle DotRect  { get { return new Rectangle(3, (Height - 9) / 2, 9, 9); } }
-    Rectangle DotHit   { get { return new Rectangle(0, 0, 18, Height); } }
+    Rectangle DotHit   { get { return new Rectangle(0, 0, 94, Height); } } // dot + its label
     Rectangle CopyRect { get { return new Rectangle(Width - 56, 3, 56, Height - 6); } }
 
     public FormatRow()
@@ -196,9 +216,11 @@ class FormatRow : Painted
         var g = e.Graphics; g.Clear(BackColor); Theme.Smooth(g);
         var dr = DotRect;
         if (Auto) using (var b = new SolidBrush(Theme.Accent)) g.FillEllipse(b, dr);
-        else using (var pen = new Pen(hoverDot ? Theme.Muted : Theme.Border)) g.DrawEllipse(pen, dr);
+        else using (var pen = new Pen(hoverDot ? Theme.Accent : Theme.Border)) g.DrawEllipse(pen, dr);
 
-        TextRenderer.DrawText(g, Label, Font, new Rectangle(20, 0, 76, Height), LabelColor, Theme.Left);
+        Color lc = LabelColor;
+        if (lc == Color.Empty) lc = hoverDot ? Theme.Text : Theme.Muted;
+        TextRenderer.DrawText(g, Label, Font, new Rectangle(20, 0, 76, Height), lc, Theme.Left);
 
         var cr = CopyRect;
         using (var p = Logo.RoundRect(cr, 4))
@@ -362,6 +384,12 @@ class ColorPicker : Form
     int autoIdx = 4;
     int sepY;
 
+    // theme animation
+    readonly Timer anim = new Timer { Interval = 15 };
+    double fromHue, fromSat, toHue, toSat;
+    DateTime animStart;
+    IntPtr iconHandle = IntPtr.Zero;
+
     ColorPicker()
     {
         Text = "Color Picker";
@@ -419,6 +447,15 @@ class ColorPicker : Form
             loupe.Track(new Point(p.X, p.Y));
         };
 
+        anim.Tick += delegate {
+            double t = Math.Min(1, (DateTime.Now - animStart).TotalMilliseconds / 400.0);
+            double e = 1 - Math.Pow(1 - t, 3); // ease-out
+            double dh = ((toHue - fromHue + 540) % 360) - 180; // shortest way round the color wheel
+            Theme.Apply((fromHue + dh * e + 360) % 360, fromSat + (toSat - fromSat) * e);
+            RefreshTheme();
+            if (t >= 1) { anim.Stop(); UpdateIcon(); }
+        };
+
         hookProc = HookCallback;
         FormClosing += delegate { StopPicking(); if (hotkeyOk) Native.UnregisterHotKey(Handle, HOTKEY_ID); };
         ResetButton();
@@ -427,13 +464,9 @@ class ColorPicker : Form
     protected override void OnHandleCreated(EventArgs e)
     {
         base.OnHandleCreated(e);
-        int on = 1, caption = Theme.Bg.B << 16 | Theme.Bg.G << 8 | Theme.Bg.R;
-        try
-        {
-            Native.DwmSetWindowAttribute(Handle, 20, ref on, 4);      // dark title bar
-            Native.DwmSetWindowAttribute(Handle, 35, ref caption, 4); // title bar color (Win 11)
-        }
-        catch { }
+        int on = 1;
+        try { Native.DwmSetWindowAttribute(Handle, 20, ref on, 4); } catch { } // dark title bar
+        SetCaptionColor();
         hotkeyOk = Native.RegisterHotKey(Handle, HOTKEY_ID, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, (uint)Keys.P);
         ResetButton();
     }
@@ -522,6 +555,56 @@ class ColorPicker : Form
         swatch.C = c;
         swatch.Invalidate();
         for (int i = 0; i < rows.Length; i++) rows[i].Box.Text = Format(i, c);
+        ThemeTo(c);
+    }
+
+    // Start fading the whole app's palette towards the color's hue.
+    void ThemeTo(Color c)
+    {
+        double tint = Theme.TintOf(c);
+        fromHue = Theme.Hue; fromSat = Theme.Sat;
+        toHue = tint > 0 ? c.GetHue() : Theme.Hue; // grays keep the hue and just lose the tint
+        toSat = tint;
+        animStart = DateTime.Now;
+        anim.Start();
+    }
+
+    void FinishThemeNow()
+    {
+        anim.Stop();
+        Theme.Apply(toHue, toSat);
+        RefreshTheme();
+        UpdateIcon();
+    }
+
+    void RefreshTheme()
+    {
+        BackColor = Theme.Bg;
+        ForeColor = Theme.Text;
+        foreach (Control ctl in Controls) ctl.BackColor = Theme.Bg;
+        foreach (var r in rows) { r.Box.BackColor = Theme.Bg; r.Box.ForeColor = Theme.Text; }
+        loupe.BackColor = Theme.Panel;
+        SetCaptionColor();
+        Invalidate(true);
+        Update();
+    }
+
+    void SetCaptionColor()
+    {
+        int caption = Theme.Bg.B << 16 | Theme.Bg.G << 8 | Theme.Bg.R;
+        try { Native.DwmSetWindowAttribute(Handle, 35, ref caption, 4); } catch { } // title bar color (Win 11)
+    }
+
+    // Window/taskbar icon with the logo tile tinted like the app.
+    void UpdateIcon()
+    {
+        using (var bmp = Logo.Render(32, Theme.Panel))
+        {
+            IntPtr h = bmp.GetHicon();
+            Icon = Icon.FromHandle(h);
+            if (iconHandle != IntPtr.Zero) Native.DestroyIcon(iconHandle);
+            iconHandle = h;
+        }
     }
 
     static void CopyText(string s)
@@ -530,13 +613,16 @@ class ColorPicker : Form
     }
 
     // Renders the window (and the loupe) to PNGs without showing them on screen; used for README screenshots.
-    static void Snapshot(string path)
+    static void Snapshot(string path) { Snapshot(path, Color.FromArgb(214, 84, 66)); }
+
+    static void Snapshot(string path, Color pick)
     {
         var f = new ColorPicker { StartPosition = FormStartPosition.Manual, Location = new Point(-5000, -5000), ShowInTaskbar = false };
         f.Show();
         f.chips.Add(Color.FromArgb(46, 139, 87)); f.chips.Add(Color.FromArgb(240, 180, 60));
         f.chips.Add(Color.FromArgb(70, 110, 200)); f.chips.Add(Color.FromArgb(200, 200, 200));
-        f.Picked(Color.FromArgb(214, 84, 66));
+        f.Picked(pick);
+        f.FinishThemeNow();
         Application.DoEvents();
         Point off = f.PointToScreen(Point.Empty);
         off.Offset(-f.Left, -f.Top);
@@ -564,9 +650,9 @@ class ColorPicker : Form
     {
         Native.SetProcessDPIAware();
         Application.EnableVisualStyles();
-        if (args.Length == 2 && args[0] == "--snapshot")
+        if (args.Length >= 2 && args[0] == "--snapshot")
         {
-            try { Snapshot(args[1]); } catch (Exception ex) { System.IO.File.WriteAllText(args[1] + ".err.txt", ex.ToString()); }
+            try { if (args.Length > 2) Snapshot(args[1], ColorTranslator.FromHtml(args[2])); else Snapshot(args[1]); } catch (Exception ex) { System.IO.File.WriteAllText(args[1] + ".err.txt", ex.ToString()); }
             return;
         }
         Application.Run(new ColorPicker());

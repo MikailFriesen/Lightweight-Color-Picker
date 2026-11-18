@@ -15,7 +15,8 @@
 - While picking, a **magnifier follows your cursor** and shows the zoomed-in pixels plus the color under the cursor.
 - **Click** anywhere to pick. The click is blocked, so nothing underneath gets clicked. **Right-click** or **Esc** cancels.
 - Copy exactly the part you need: `R`, `G`, `B`, `R, G, B`, `rgb(R, G, B)`, `#RRGGBB` or `RRGGBB`.
-- Click the dot next to a format to copy it **automatically** after every pick.
+- Click a format's name (or the dot next to it) to copy that format **automatically** after every pick.
+- **The app takes on the color you pick.** Background, buttons, title bar and icon fade to the picked color's hue. Grays make it neutral.
 - **History** of your last 10 colors. Click one to load it again.
 - Dark UI that works correctly on high-DPI and scaled displays.
 
