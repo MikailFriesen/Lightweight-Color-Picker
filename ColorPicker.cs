@@ -40,21 +40,30 @@ static class Native
 
 static class Theme
 {
-    public static readonly Color Bg     = Color.FromArgb(23, 25, 30);
-    public static readonly Color Panel  = Color.FromArgb(33, 36, 43);
-    public static readonly Color Hover  = Color.FromArgb(43, 47, 56);
-    public static readonly Color Border = Color.FromArgb(52, 57, 68);
-    public static readonly Color Text   = Color.FromArgb(230, 233, 240);
-    public static readonly Color Muted  = Color.FromArgb(138, 145, 160);
-    public static readonly Color Accent = Color.FromArgb(64, 148, 250);
-    public static readonly Color AccentHi = Color.FromArgb(92, 166, 255);
-    public static readonly Color Ok     = Color.FromArgb(110, 200, 120);
-    public static readonly Color R      = Color.FromArgb(240, 112, 112);
-    public static readonly Color G      = Color.FromArgb(108, 200, 122);
-    public static readonly Color B      = Color.FromArgb(104, 158, 250);
+    // One system: every neutral shares hue 220 / saturation 14% and only steps in lightness;
+    // every color shares saturation 70% / lightness 62% (same as the logo's ring) and only changes hue.
+    const double NH = 220, NS = 0.14, CS = 0.70, CL = 0.62;
+    static Color N(double l) { return Logo.Hsl(NH, NS, l); }
+    static Color C(double h) { return Logo.Hsl(h, CS, CL); }
+
+    public static readonly Color Bg       = N(0.10);
+    public static readonly Color Panel    = Logo.Tile;  // 0.14, also the logo tile
+    public static readonly Color Hover    = N(0.19);
+    public static readonly Color Border   = N(0.24);
+    public static readonly Color Muted    = N(0.60);
+    public static readonly Color Text     = N(0.92);
+
+    public static readonly Color Accent   = C(214);
+    public static readonly Color AccentHi = Logo.Hsl(214, CS, 0.70);
+    public static readonly Color R        = C(0);
+    public static readonly Color G        = Logo.Hsl(135, 0.50, 0.55); // green reads brighter, so it's toned down to match R and B
+    public static readonly Color B        = Accent;    // blue channel = the accent
+    public static readonly Color Ok       = G;         // "copied" uses the same green
 
     public static string Hex(Color c) { return string.Format("#{0:X2}{1:X2}{2:X2}", c.R, c.G, c.B); }
-    public static Color Contrast(Color c) { return (c.R * 299 + c.G * 587 + c.B * 114) / 1000 > 150 ? Color.Black : Color.White; }
+    public static bool IsLight(Color c) { return (c.R * 299 + c.G * 587 + c.B * 114) / 1000 > 150; }
+    public static Color Contrast(Color c) { return IsLight(c) ? Bg : Text; }
+    public static Color ContrastSoft(Color c) { return Color.FromArgb(170, Contrast(c)); }
 
     public static void Smooth(Graphics g)
     {
@@ -99,7 +108,7 @@ class FlatButton : Painted
             else
                 using (var b = new SolidBrush(hover ? Theme.AccentHi : Theme.Accent)) g.FillPath(b, p);
         }
-        TextRenderer.DrawText(g, Text, Font, ClientRectangle, Active ? Theme.AccentHi : Color.White, Theme.Center);
+        TextRenderer.DrawText(g, Text, Font, ClientRectangle, Active ? Theme.AccentHi : Theme.Bg, Theme.Center);
     }
 }
 
@@ -120,12 +129,17 @@ class Swatch : Painted
                 return;
             }
             using (var b = new SolidBrush(C.Value)) g.FillPath(b, p);
-            using (var pen = new Pen(Color.FromArgb(30, 255, 255, 255))) g.DrawPath(pen, p);
+            using (var pen = new Pen(Theme.Border)) g.DrawPath(pen, p);
         }
         Color c = C.Value, fg = Theme.Contrast(c);
         TextRenderer.DrawText(g, Theme.Hex(c), Mono, new Rectangle(12, 0, Width - 24, Height), fg, Theme.Left);
+        // TextRenderer ignores alpha, so blend the soft contrast color onto the swatch manually
+        Color soft = Theme.ContrastSoft(c);
+        Color blended = Color.FromArgb((soft.R * soft.A + c.R * (255 - soft.A)) / 255,
+                                       (soft.G * soft.A + c.G * (255 - soft.A)) / 255,
+                                       (soft.B * soft.A + c.B * (255 - soft.A)) / 255);
         TextRenderer.DrawText(g, string.Format("{0}, {1}, {2}", c.R, c.G, c.B), Font, new Rectangle(12, 0, Width - 24, Height),
-            Color.FromArgb(fg.R == 0 ? 90 : 200, fg.R == 0 ? 90 : 200, fg.R == 0 ? 90 : 200), Theme.Right);
+            blended, Theme.Right);
     }
 }
 
@@ -302,8 +316,8 @@ class Loupe : Form
         g.PixelOffsetMode = PixelOffsetMode.Default;
 
         var mid = new Rectangle(Pad + (N / 2) * Z, Pad + (N / 2) * Z, Z - 1, Z - 1);
-        using (var outer = new Pen(Color.Black)) g.DrawRectangle(outer, Rectangle.Inflate(mid, 1, 1));
-        using (var inner = new Pen(Color.White)) g.DrawRectangle(inner, mid);
+        using (var outer = new Pen(Theme.Bg)) g.DrawRectangle(outer, Rectangle.Inflate(mid, 1, 1));
+        using (var inner = new Pen(Theme.Text)) g.DrawRectangle(inner, mid);
 
         int iy = Pad * 2 + N * Z;
         var chip = new Rectangle(Pad, iy + 2, 12, 12);

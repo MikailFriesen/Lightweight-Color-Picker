@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
@@ -28,6 +28,15 @@ static class Logo
         return Color.FromArgb((int)((r + m) * 255), (int)((g + m) * 255), (int)((b + m) * 255));
     }
 
+    public static Color Hsl(double h, double s, double l)
+    {
+        double v = l + s * Math.Min(l, 1 - l);
+        return Hsv(h, v == 0 ? 0 : 2 * (1 - l / v), v);
+    }
+
+    // Shared neutral used by the app background, so the icon matches the window.
+    public static readonly Color Tile = Hsl(220, 0.14, 0.14);
+
     // Dark rounded tile, glowing hue ring, white crosshair in the middle.
     public static void Draw(Graphics g, RectangleF bounds)
     {
@@ -38,20 +47,20 @@ static class Logo
         float s = bounds.Width, x0 = bounds.X, y0 = bounds.Y;
 
         using (var tile = RoundRect(bounds, s * 0.18f))
-        using (var bg = new SolidBrush(Color.FromArgb(32, 32, 32)))
+        using (var bg = new SolidBrush(Tile))
             g.FillPath(bg, tile);
 
         // hue ring (conic gradient built from thin slices)
         float pad = s * 0.13f, d = s - 2 * pad;
         var ring = new RectangleF(x0 + pad, y0 + pad, d, d);
         for (int a = 0; a < 360; a += 3)
-            using (var b = new SolidBrush(Hsv(a, 0.72, 0.95)))
+            using (var b = new SolidBrush(Hsl(a, 0.70, 0.62)))
                 g.FillPie(b, ring.X, ring.Y, ring.Width, ring.Height, a - 90, 4f);
 
         // inner disc
         float inner = d * 0.60f;
         var ir = new RectangleF(x0 + (s - inner) / 2, y0 + (s - inner) / 2, inner, inner);
-        using (var b = new SolidBrush(Color.FromArgb(32, 32, 32)))
+        using (var b = new SolidBrush(Tile))
             g.FillEllipse(b, ir);
 
         // crosshair
@@ -82,3 +91,4 @@ static class Logo
         return bmp;
     }
 }
+
