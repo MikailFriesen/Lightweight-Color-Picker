@@ -12,7 +12,7 @@ A tiny portable Windows color picker (a single ~13 KB `.exe`, no install).
 - Correct on high-DPI / scaled displays
 
 ## Download
-Grab `ColorPicker.exe` from the Releases page and double-click it. Needs .NET Framework 4, which ships with Windows 10 and 11.
+Download [`ColorPicker.exe`](ColorPicker.exe?raw=true) from this repo and double-click it. Needs .NET Framework 4, which ships with Windows 10 and 11.
 
 ## Build it yourself
 Uses the C# compiler that comes with Windows:
