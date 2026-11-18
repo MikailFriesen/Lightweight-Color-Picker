@@ -40,28 +40,26 @@ static class Native
 
 static class Theme
 {
-    public static readonly Color Bg      = Color.FromArgb(17, 17, 27);
-    public static readonly Color Panel   = Color.FromArgb(30, 30, 46);
-    public static readonly Color PanelHi = Color.FromArgb(49, 50, 68);
-    public static readonly Color Border  = Color.FromArgb(58, 58, 82);
-    public static readonly Color Text    = Color.FromArgb(205, 214, 244);
-    public static readonly Color Muted   = Color.FromArgb(127, 132, 156);
-    public static readonly Color Blue    = Color.FromArgb(137, 180, 250);
-    public static readonly Color Mauve   = Color.FromArgb(203, 166, 247);
-    public static readonly Color Pink    = Color.FromArgb(243, 139, 168);
-    public static readonly Color Peach   = Color.FromArgb(250, 179, 135);
-    public static readonly Color Green   = Color.FromArgb(166, 227, 161);
+    public static readonly Color Bg     = Color.FromArgb(28, 28, 28);
+    public static readonly Color Panel  = Color.FromArgb(38, 38, 38);
+    public static readonly Color Hover  = Color.FromArgb(48, 48, 48);
+    public static readonly Color Border = Color.FromArgb(58, 58, 58);
+    public static readonly Color Text   = Color.FromArgb(228, 228, 228);
+    public static readonly Color Muted  = Color.FromArgb(135, 135, 135);
+    public static readonly Color Accent = Color.FromArgb(74, 158, 255);
+    public static readonly Color Ok     = Color.FromArgb(110, 200, 120);
 
-    public static Color Contrast(Color c) { return (c.R * 299 + c.G * 587 + c.B * 114) / 1000 > 150 ? Bg : Color.White; }
-    public static Color Lighten(Color c, int a) { return Color.FromArgb(Math.Min(255, c.R + a), Math.Min(255, c.G + a), Math.Min(255, c.B + a)); }
     public static string Hex(Color c) { return string.Format("#{0:X2}{1:X2}{2:X2}", c.R, c.G, c.B); }
+    public static Color Contrast(Color c) { return (c.R * 299 + c.G * 587 + c.B * 114) / 1000 > 150 ? Color.Black : Color.White; }
 
     public static void Smooth(Graphics g)
     {
         g.SmoothingMode = SmoothingMode.AntiAlias;
-        g.PixelOffsetMode = PixelOffsetMode.HighQuality;
         g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
     }
+
+    public const TextFormatFlags Center = TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter;
+    public const TextFormatFlags Left = TextFormatFlags.Left | TextFormatFlags.VerticalCenter;
 }
 
 abstract class Painted : Control
@@ -74,65 +72,51 @@ abstract class Painted : Control
     }
 }
 
-// Gradient "Pick color" button
-class GradButton : Painted
+class FlatButton : Painted
 {
     public bool Active;
-    bool hover, down;
-    public GradButton() { Cursor = Cursors.Hand; }
+    bool hover;
+    public FlatButton() { Cursor = Cursors.Hand; }
     protected override void OnMouseEnter(EventArgs e) { hover = true; Invalidate(); base.OnMouseEnter(e); }
-    protected override void OnMouseLeave(EventArgs e) { hover = false; down = false; Invalidate(); base.OnMouseLeave(e); }
-    protected override void OnMouseDown(MouseEventArgs e) { down = true; Invalidate(); base.OnMouseDown(e); }
-    protected override void OnMouseUp(MouseEventArgs e) { down = false; Invalidate(); base.OnMouseUp(e); }
+    protected override void OnMouseLeave(EventArgs e) { hover = false; Invalidate(); base.OnMouseLeave(e); }
     protected override void OnTextChanged(EventArgs e) { Invalidate(); base.OnTextChanged(e); }
 
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics; g.Clear(BackColor); Theme.Smooth(g);
-        var r = new RectangleF(0.5f, 0.5f, Width - 1, Height - 1);
-        Color a = Active ? Theme.Pink : Theme.Blue, b = Active ? Theme.Peach : Theme.Mauve;
-        int lift = down ? -15 : hover ? 18 : 0;
-        if (lift > 0) { a = Theme.Lighten(a, lift); b = Theme.Lighten(b, lift); }
-        using (var p = Logo.RoundRect(r, 11))
-        using (var br = new LinearGradientBrush(r, a, b, 0f))
-            g.FillPath(br, p);
-        TextRenderer.DrawText(g, Text, Font, ClientRectangle, Theme.Bg,
-            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+        using (var p = Logo.RoundRect(new RectangleF(0.5f, 0.5f, Width - 1, Height - 1), 4))
+        {
+            using (var b = new SolidBrush(hover ? Theme.Hover : Theme.Panel)) g.FillPath(b, p);
+            using (var pen = new Pen(Active ? Theme.Accent : Theme.Border)) g.DrawPath(pen, p);
+        }
+        TextRenderer.DrawText(g, Text, Font, ClientRectangle, Active ? Theme.Accent : Theme.Text, Theme.Center);
     }
 }
 
-// Big preview of the picked color
 class Swatch : Painted
 {
     public Color? C;
-    public string Hint = "";
-    public Font Big;
+    public Font Mono;
 
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics; g.Clear(BackColor); Theme.Smooth(g);
-        var r = new RectangleF(0.5f, 0.5f, Width - 1, Height - 1);
-        using (var p = Logo.RoundRect(r, 12))
+        using (var p = Logo.RoundRect(new RectangleF(0.5f, 0.5f, Width - 1, Height - 1), 4))
         {
             if (C == null)
             {
-                using (var b = new SolidBrush(Theme.Panel)) g.FillPath(b, p);
-                using (var pen = new Pen(Theme.Border, 1.5f) { DashStyle = DashStyle.Dash }) g.DrawPath(pen, p);
-                TextRenderer.DrawText(g, Hint, Font, ClientRectangle, Theme.Muted,
-                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                using (var pen = new Pen(Theme.Border)) g.DrawPath(pen, p);
+                TextRenderer.DrawText(g, "No color picked", Font, ClientRectangle, Theme.Muted, Theme.Center);
                 return;
             }
-            Color c = C.Value, fg = Theme.Contrast(c);
-            using (var b = new SolidBrush(c)) g.FillPath(b, p);
-            using (var pen = new Pen(Color.FromArgb(40, 255, 255, 255))) g.DrawPath(pen, p);
-            TextRenderer.DrawText(g, Theme.Hex(c), Big, new Point(16, 12), fg);
-            TextRenderer.DrawText(g, string.Format("rgb({0}, {1}, {2})", c.R, c.G, c.B), Font, new Point(18, Height - 30),
-                Color.FromArgb(200, fg));
+            using (var b = new SolidBrush(C.Value)) g.FillPath(b, p);
+            using (var pen = new Pen(Color.FromArgb(30, 255, 255, 255))) g.DrawPath(pen, p);
         }
+        TextRenderer.DrawText(g, Theme.Hex(C.Value), Mono, new Rectangle(10, 0, Width - 20, Height), Theme.Contrast(C.Value), Theme.Left);
     }
 }
 
-// One output format: auto-copy dot, label, selectable value, copy button
+// label | value | copy, with a small dot on the left to choose the auto-copied format
 class FormatRow : Painted
 {
     public string Label;
@@ -140,16 +124,17 @@ class FormatRow : Painted
     public readonly TextBox Box;
     public event EventHandler CopyClick, AutoClick;
     bool hoverCopy, hoverDot, copied;
-    readonly Timer reset = new Timer { Interval = 1300 };
+    readonly Timer reset = new Timer { Interval = 1200 };
 
-    Rectangle DotRect  { get { return new Rectangle(12, (Height - 14) / 2, 14, 14); } }
-    Rectangle CopyRect { get { return new Rectangle(Width - 76, 5, 70, Height - 10); } }
+    Rectangle DotRect  { get { return new Rectangle(2, (Height - 8) / 2, 8, 8); } }
+    Rectangle DotHit   { get { return new Rectangle(0, 0, 16, Height); } }
+    Rectangle CopyRect { get { return new Rectangle(Width - 48, 2, 48, Height - 4); } }
 
     public FormatRow()
     {
-        Height = 36;
-        Box = new TextBox { BorderStyle = BorderStyle.None, ReadOnly = true, BackColor = Theme.Panel,
-                            ForeColor = Theme.Text, Font = new Font("Consolas", 10.5f), TabStop = false };
+        Height = 24;
+        Box = new TextBox { BorderStyle = BorderStyle.None, ReadOnly = true, BackColor = Theme.Bg,
+                            ForeColor = Theme.Text, Font = new Font("Consolas", 9.5f), TabStop = false };
         Controls.Add(Box);
         reset.Tick += delegate { reset.Stop(); copied = false; Invalidate(); };
     }
@@ -158,15 +143,15 @@ class FormatRow : Painted
     {
         base.OnLayout(e);
         if (Box == null) return;
-        Box.Location = new Point(112, (Height - Box.Height) / 2 + 1);
-        Box.Width = Width - 112 - 84;
+        Box.Location = new Point(84, (Height - Box.Height) / 2 + 1);
+        Box.Width = Width - 84 - 52;
     }
 
     public void Flash() { copied = true; Invalidate(); reset.Stop(); reset.Start(); }
 
     protected override void OnMouseMove(MouseEventArgs e)
     {
-        bool c = CopyRect.Contains(e.Location), d = Rectangle.Inflate(DotRect, 6, 6).Contains(e.Location);
+        bool c = CopyRect.Contains(e.Location), d = DotHit.Contains(e.Location);
         if (c != hoverCopy || d != hoverDot) { hoverCopy = c; hoverDot = d; Cursor = (c || d) ? Cursors.Hand : Cursors.Default; Invalidate(); }
         base.OnMouseMove(e);
     }
@@ -174,48 +159,38 @@ class FormatRow : Painted
     protected override void OnMouseClick(MouseEventArgs e)
     {
         if (CopyRect.Contains(e.Location) && CopyClick != null) CopyClick(this, e);
-        else if (Rectangle.Inflate(DotRect, 6, 6).Contains(e.Location) && AutoClick != null) AutoClick(this, e);
+        else if (DotHit.Contains(e.Location) && AutoClick != null) AutoClick(this, e);
         base.OnMouseClick(e);
     }
 
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics; g.Clear(BackColor); Theme.Smooth(g);
-        using (var p = Logo.RoundRect(new RectangleF(0.5f, 0.5f, Width - 1, Height - 1), 9))
-        using (var b = new SolidBrush(Theme.Panel))
-            g.FillPath(b, p);
-
         var dr = DotRect;
-        if (Auto)
-            using (var b = new LinearGradientBrush(dr, Theme.Blue, Theme.Mauve, 45f)) g.FillEllipse(b, dr);
-        else
-            using (var pen = new Pen(hoverDot ? Theme.Text : Theme.Border, 1.5f)) g.DrawEllipse(pen, dr);
+        if (Auto) using (var b = new SolidBrush(Theme.Accent)) g.FillEllipse(b, dr);
+        else using (var pen = new Pen(hoverDot ? Theme.Muted : Theme.Border)) g.DrawEllipse(pen, dr);
 
-        TextRenderer.DrawText(g, Label, Font, new Rectangle(34, 0, 78, Height), Auto ? Theme.Text : Theme.Muted,
-            TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
+        TextRenderer.DrawText(g, Label, Font, new Rectangle(16, 0, 66, Height), Theme.Muted, Theme.Left);
 
         var cr = CopyRect;
-        using (var p = Logo.RoundRect(cr, 7))
-        using (var b = new SolidBrush(hoverCopy ? Theme.Lighten(Theme.PanelHi, 14) : Theme.PanelHi))
-            g.FillPath(b, p);
-        TextRenderer.DrawText(g, copied ? "Copied ✓" : "Copy", Font, cr, copied ? Theme.Green : Theme.Text,
-            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+        if (hoverCopy && !copied)
+            using (var p = Logo.RoundRect(cr, 3)) using (var b = new SolidBrush(Theme.Hover)) g.FillPath(b, p);
+        TextRenderer.DrawText(g, copied ? "copied" : "copy", Font, cr,
+            copied ? Theme.Ok : hoverCopy ? Theme.Text : Theme.Muted, Theme.Center);
     }
 }
 
-// Row of recently picked colors
 class Chips : Painted
 {
     public readonly List<Color> Items = new List<Color>();
     public event Action<Color> ChipClick;
     int hover = -1;
-    const int S = 28, G = 6, Max = 10;
+    const int S = 20, G = 4, Max = 10;
 
     Rectangle ChipRect(int i) { return new Rectangle(1 + i * (S + G), (Height - S) / 2, S, S); }
-
     public void Add(Color c) { Items.Insert(0, c); if (Items.Count > Max) Items.RemoveAt(Max); Invalidate(); }
-
     int Hit(Point p) { for (int i = 0; i < Items.Count; i++) if (ChipRect(i).Contains(p)) return i; return -1; }
+
     protected override void OnMouseMove(MouseEventArgs e)
     {
         int h = Hit(e.Location);
@@ -235,29 +210,25 @@ class Chips : Painted
         var g = e.Graphics; g.Clear(BackColor); Theme.Smooth(g);
         if (Items.Count == 0)
         {
-            TextRenderer.DrawText(g, "Your picks will show up here", Font, ClientRectangle, Theme.Muted,
-                TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
+            TextRenderer.DrawText(g, "History is empty", Font, ClientRectangle, Theme.Muted, Theme.Left);
             return;
         }
         for (int i = 0; i < Items.Count; i++)
-        {
-            var r = ChipRect(i);
-            using (var p = Logo.RoundRect(r, 8))
+            using (var p = Logo.RoundRect(ChipRect(i), 3))
             {
                 using (var b = new SolidBrush(Items[i])) g.FillPath(b, p);
-                using (var pen = new Pen(i == hover ? Theme.Text : Theme.Border, i == hover ? 2f : 1f)) g.DrawPath(pen, p);
+                using (var pen = new Pen(i == hover ? Theme.Text : Theme.Border)) g.DrawPath(pen, p);
             }
-        }
     }
 }
 
 // Magnifier that follows the cursor while picking
 class Loupe : Form
 {
-    const int N = 11, Z = 12, Pad = 8, Info = 34;
+    const int N = 11, Z = 9, Pad = 5, Info = 22;
     readonly Bitmap cap = new Bitmap(N, N, PixelFormat.Format32bppRgb);
     Color center;
-    readonly Font mono = new Font("Consolas", 9.5f);
+    readonly Font mono = new Font("Consolas", 8.5f);
 
     public Loupe()
     {
@@ -268,7 +239,6 @@ class Loupe : Form
         BackColor = Theme.Panel;
         DoubleBuffered = true;
         ClientSize = new Size(N * Z + Pad * 2, N * Z + Pad * 2 + Info);
-        using (var p = Logo.RoundRect(new RectangleF(0, 0, Width, Height), 12)) Region = new Region(p);
     }
 
     protected override bool ShowWithoutActivation { get { return true; } }
@@ -278,8 +248,7 @@ class Loupe : Form
         get
         {
             var cp = base.CreateParams;
-            // toolwindow | noactivate | click-through (transparent + layered) | topmost
-            cp.ExStyle |= 0x80 | 0x08000000 | 0x20 | 0x80000 | 0x8;
+            cp.ExStyle |= 0x80 | 0x08000000 | 0x20 | 0x80000 | 0x8; // toolwindow, noactivate, click-through, topmost
             return cp;
         }
     }
@@ -287,7 +256,7 @@ class Loupe : Form
     protected override void OnHandleCreated(EventArgs e)
     {
         base.OnHandleCreated(e);
-        Native.SetLayeredWindowAttributes(Handle, 0, 250, 2);
+        Native.SetLayeredWindowAttributes(Handle, 0, 255, 2);
         try { Native.SetWindowDisplayAffinity(Handle, 0x11); } catch { } // keep the loupe out of its own screen capture
     }
 
@@ -301,9 +270,9 @@ class Loupe : Form
         center = Native.ColorAt(p.X, p.Y);
 
         var wa = Screen.FromPoint(p).WorkingArea;
-        int x = p.X + 24, y = p.Y + 24;
-        if (x + Width > wa.Right) x = p.X - 24 - Width;
-        if (y + Height > wa.Bottom) y = p.Y - 24 - Height;
+        int x = p.X + 18, y = p.Y + 18;
+        if (x + Width > wa.Right) x = p.X - 18 - Width;
+        if (y + Height > wa.Bottom) y = p.Y - 18 - Height;
         if (Location.X != x || Location.Y != y) Location = new Point(x, y);
         Invalidate();
     }
@@ -314,36 +283,20 @@ class Loupe : Form
         g.Clear(Theme.Panel);
         g.InterpolationMode = InterpolationMode.NearestNeighbor;
         g.PixelOffsetMode = PixelOffsetMode.Half;
-        var area = new Rectangle(Pad, Pad, N * Z, N * Z);
-        g.DrawImage(cap, area);
+        g.DrawImage(cap, new Rectangle(Pad, Pad, N * Z, N * Z));
         g.PixelOffsetMode = PixelOffsetMode.Default;
 
-        using (var grid = new Pen(Color.FromArgb(35, 0, 0, 0)))
-            for (int i = 1; i < N; i++)
-            {
-                g.DrawLine(grid, Pad + i * Z, Pad, Pad + i * Z, Pad + N * Z);
-                g.DrawLine(grid, Pad, Pad + i * Z, Pad + N * Z, Pad + i * Z);
-            }
+        var mid = new Rectangle(Pad + (N / 2) * Z, Pad + (N / 2) * Z, Z - 1, Z - 1);
+        using (var outer = new Pen(Color.Black)) g.DrawRectangle(outer, Rectangle.Inflate(mid, 1, 1));
+        using (var inner = new Pen(Color.White)) g.DrawRectangle(inner, mid);
 
-        var mid = new Rectangle(Pad + (N / 2) * Z, Pad + (N / 2) * Z, Z, Z);
-        using (var outer = new Pen(Color.Black, 1)) g.DrawRectangle(outer, Rectangle.Inflate(mid, 1, 1));
-        using (var inner = new Pen(Color.White, 1)) g.DrawRectangle(inner, mid);
-
-        Theme.Smooth(g);
         int iy = Pad * 2 + N * Z;
-        var chip = new RectangleF(Pad, iy + 4, 22, 22);
-        using (var p = Logo.RoundRect(chip, 6))
-        {
-            using (var b = new SolidBrush(center)) g.FillPath(b, p);
-            using (var pen = new Pen(Theme.Border)) g.DrawPath(pen, p);
-        }
-        TextRenderer.DrawText(g, Theme.Hex(center), mono, new Point(Pad + 28, iy + 1), Theme.Text);
-        TextRenderer.DrawText(g, string.Format("{0}, {1}, {2}", center.R, center.G, center.B), mono,
-            new Point(Pad + 28, iy + 16), Theme.Muted);
+        var chip = new Rectangle(Pad, iy + 2, 12, 12);
+        using (var b = new SolidBrush(center)) g.FillRectangle(b, chip);
+        using (var pen = new Pen(Theme.Border)) g.DrawRectangle(pen, chip);
+        TextRenderer.DrawText(g, Theme.Hex(center), mono, new Rectangle(Pad + 16, iy, Width, 16), Theme.Text, Theme.Left);
 
-        using (var pen = new Pen(Theme.Border, 1.5f))
-        using (var p = Logo.RoundRect(new RectangleF(0.75f, 0.75f, Width - 1.5f, Height - 1.5f), 12))
-            g.DrawPath(pen, p);
+        using (var pen = new Pen(Theme.Border)) g.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
     }
 }
 
@@ -353,7 +306,7 @@ class ColorPicker : Form
     const int WM_HOTKEY = 0x0312, HOTKEY_ID = 1;
     const uint MOD_CONTROL = 0x2, MOD_SHIFT = 0x4, MOD_NOREPEAT = 0x4000;
 
-    static readonly string[] FormatNames = { "Red", "Green", "Blue", "R, G, B", "rgb()", "Hex", "Hex (no #)" };
+    static readonly string[] FormatNames = { "Red", "Green", "Blue", "R, G, B", "rgb()", "Hex", "Hex, no #" };
     static string Format(int i, Color c)
     {
         switch (i)
@@ -372,16 +325,13 @@ class ColorPicker : Form
     IntPtr hook = IntPtr.Zero;
     bool swallowUp, hotkeyOk;
     readonly Timer timer = new Timer { Interval = 15 };
-    readonly GradButton pickBtn;
+    readonly FlatButton pickBtn;
     readonly Swatch swatch;
     readonly FormatRow[] rows = new FormatRow[FormatNames.Length];
     readonly Chips chips;
     readonly Loupe loupe = new Loupe();
-    readonly Font titleFont = new Font("Segoe UI Semibold", 14f);
-    readonly Font smallFont = new Font("Segoe UI", 8.25f, FontStyle.Bold);
     int autoIdx = 4;
-    string subtitle = "Ctrl+Shift+P to pick  ·  Esc to cancel";
-    int formatsY, historyY;
+    int sepY;
 
     ColorPicker()
     {
@@ -391,23 +341,21 @@ class ColorPicker : Form
         TopMost = true;
         BackColor = Theme.Bg;
         ForeColor = Theme.Text;
-        Font = new Font("Segoe UI", 9.75f);
+        Font = new Font("Segoe UI", 9f);
         DoubleBuffered = true;
         KeyPreview = true;
         try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
 
-        const int X = 20, W = 370;
-        int y = 80;
+        const int X = 12, W = 256;
+        int y = 12;
 
-        pickBtn = new GradButton { Location = new Point(X, y), Size = new Size(W, 46), Font = new Font("Segoe UI Semibold", 10.5f) };
+        pickBtn = new FlatButton { Location = new Point(X, y), Size = new Size(W, 30) };
         pickBtn.Click += delegate { if (hook == IntPtr.Zero) StartPicking(); else StopPicking(); };
-        y += 58;
+        y += 40;
 
-        swatch = new Swatch { Location = new Point(X, y), Size = new Size(W, 88), Big = new Font("Segoe UI Semibold", 20f),
-                              Hint = "Nothing picked yet" };
-        y += 104;
+        swatch = new Swatch { Location = new Point(X, y), Size = new Size(W, 48), Mono = new Font("Consolas", 13f) };
+        y += 56;
 
-        formatsY = y; y += 24;
         var tip = new ToolTip();
         for (int i = 0; i < rows.Length; i++)
         {
@@ -415,17 +363,16 @@ class ColorPicker : Form
             var row = new FormatRow { Label = FormatNames[i], Location = new Point(X, y), Width = W, Auto = i == autoIdx };
             row.CopyClick += delegate { if (swatch.C != null) { CopyText(Format(idx, swatch.C.Value)); row.Flash(); } };
             row.AutoClick += delegate { SetAuto(idx); };
-            tip.SetToolTip(row, "Click the dot to auto-copy this format after each pick");
+            tip.SetToolTip(row, "Dot: copy this format automatically after each pick");
             rows[i] = row;
             Controls.Add(row);
-            y += 40;
+            y += 24;
         }
-        y += 10;
 
-        historyY = y; y += 24;
-        chips = new Chips { Location = new Point(X, y), Size = new Size(W, 34) };
+        sepY = y + 6; y += 13;
+        chips = new Chips { Location = new Point(X, y), Size = new Size(W, 24) };
         chips.ChipClick += Display;
-        y += 34 + 20;
+        y += 24 + 10;
 
         Controls.Add(pickBtn);
         Controls.Add(swatch);
@@ -456,22 +403,13 @@ class ColorPicker : Form
         }
         catch { }
         hotkeyOk = Native.RegisterHotKey(Handle, HOTKEY_ID, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, (uint)Keys.P);
-        if (!hotkeyOk) subtitle = "Ctrl+Shift+P is used by another app";
         ResetButton();
     }
 
     protected override void OnPaint(PaintEventArgs e)
     {
         base.OnPaint(e);
-        var g = e.Graphics; Theme.Smooth(g);
-        Logo.Draw(g, new RectangleF(20, 18, 44, 44));
-        TextRenderer.DrawText(g, "Color Picker", titleFont, new Point(74, 14), Theme.Text);
-        TextRenderer.DrawText(g, subtitle, Font, new Point(76, 42), hotkeyOk ? Theme.Muted : Theme.Pink);
-
-        TextRenderer.DrawText(g, "FORMATS", smallFont, new Point(20, formatsY), Theme.Muted);
-        TextRenderer.DrawText(g, "● = copied automatically", Font, new Rectangle(190, formatsY - 2, 200, 20), Theme.Muted,
-            TextFormatFlags.Right);
-        TextRenderer.DrawText(g, "HISTORY", smallFont, new Point(20, historyY), Theme.Muted);
+        using (var pen = new Pen(Theme.Border)) e.Graphics.DrawLine(pen, 12, sepY, ClientSize.Width - 12, sepY);
     }
 
     protected override void WndProc(ref Message m)
@@ -487,8 +425,7 @@ class ColorPicker : Form
     {
         if (pickBtn == null) return;
         pickBtn.Active = false;
-        pickBtn.Text = hotkeyOk ? "Pick a color    Ctrl + Shift + P" : "Pick a color";
-        pickBtn.Invalidate();
+        pickBtn.Text = hotkeyOk ? "Pick   (Ctrl+Shift+P)" : "Pick   (hotkey in use)";
     }
 
     void SetAuto(int idx)
@@ -503,8 +440,7 @@ class ColorPicker : Form
         hook = Native.SetWindowsHookEx(WH_MOUSE_LL, hookProc,
             Native.GetModuleHandle(Process.GetCurrentProcess().MainModule.ModuleName), 0);
         pickBtn.Active = true;
-        pickBtn.Text = "Picking…  click anywhere  ·  Esc cancels";
-        pickBtn.Invalidate();
+        pickBtn.Text = "Click to pick   (Esc to cancel)";
         Native.POINT p; Native.GetCursorPos(out p);
         loupe.Track(new Point(p.X, p.Y));
         loupe.Show();
@@ -561,14 +497,14 @@ class ColorPicker : Form
         try { Clipboard.SetText(s); } catch { }
     }
 
-    // Renders the window (and the loupe) to a PNG without showing it on screen; used for README screenshots.
+    // Renders the window (and the loupe) to PNGs without showing them on screen; used for README screenshots.
     static void Snapshot(string path)
     {
         var f = new ColorPicker { StartPosition = FormStartPosition.Manual, Location = new Point(-5000, -5000), ShowInTaskbar = false };
         f.Show();
-        f.chips.Add(Color.FromArgb(166, 227, 161)); f.chips.Add(Color.FromArgb(250, 179, 135));
-        f.chips.Add(Color.FromArgb(137, 180, 250)); f.chips.Add(Color.FromArgb(203, 166, 247));
-        f.Picked(Color.FromArgb(243, 139, 168));
+        f.chips.Add(Color.FromArgb(46, 139, 87)); f.chips.Add(Color.FromArgb(240, 180, 60));
+        f.chips.Add(Color.FromArgb(70, 110, 200)); f.chips.Add(Color.FromArgb(200, 200, 200));
+        f.Picked(Color.FromArgb(214, 84, 66));
         Application.DoEvents();
         Point off = f.PointToScreen(Point.Empty);
         off.Offset(-f.Left, -f.Top);
@@ -578,7 +514,6 @@ class ColorPicker : Form
             using (var client = full.Clone(new Rectangle(off, f.ClientSize), full.PixelFormat))
                 client.Save(path, ImageFormat.Png);
         }
-        // loupe preview, showing whatever is under the real cursor
         Native.POINT p; Native.GetCursorPos(out p);
         f.loupe.Track(new Point(p.X, p.Y));
         f.loupe.Location = new Point(-5000, -5000);

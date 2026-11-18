@@ -37,21 +37,21 @@ static class Logo
 
         float s = bounds.Width, x0 = bounds.X, y0 = bounds.Y;
 
-        using (var tile = RoundRect(bounds, s * 0.24f))
-        using (var bg = new LinearGradientBrush(bounds, Color.FromArgb(40, 38, 62), Color.FromArgb(12, 12, 20), 45f))
+        using (var tile = RoundRect(bounds, s * 0.18f))
+        using (var bg = new SolidBrush(Color.FromArgb(32, 32, 32)))
             g.FillPath(bg, tile);
 
         // hue ring (conic gradient built from thin slices)
         float pad = s * 0.13f, d = s - 2 * pad;
         var ring = new RectangleF(x0 + pad, y0 + pad, d, d);
         for (int a = 0; a < 360; a += 3)
-            using (var b = new SolidBrush(Hsv(a + 200, 0.78, 1.0)))
+            using (var b = new SolidBrush(Hsv(a, 0.72, 0.95)))
                 g.FillPie(b, ring.X, ring.Y, ring.Width, ring.Height, a - 90, 4f);
 
         // inner disc
         float inner = d * 0.60f;
         var ir = new RectangleF(x0 + (s - inner) / 2, y0 + (s - inner) / 2, inner, inner);
-        using (var b = new LinearGradientBrush(ir, Color.FromArgb(34, 33, 52), Color.FromArgb(16, 16, 26), 90f))
+        using (var b = new SolidBrush(Color.FromArgb(32, 32, 32)))
             g.FillEllipse(b, ir);
 
         // crosshair
