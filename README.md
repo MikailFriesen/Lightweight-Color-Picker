@@ -7,7 +7,7 @@
 <p align="center">A tiny portable color picker for Windows. One <code>.exe</code>, no install.</p>
 
 <p align="center">
-  <img src="assets/screenshot.png" width="280" alt="Screenshot">
+  <img src="assets/screenshot.png" width="328" alt="Screenshot">
 </p>
 
 ## Features

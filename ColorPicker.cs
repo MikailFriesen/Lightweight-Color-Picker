@@ -40,14 +40,18 @@ static class Native
 
 static class Theme
 {
-    public static readonly Color Bg     = Color.FromArgb(28, 28, 28);
-    public static readonly Color Panel  = Color.FromArgb(38, 38, 38);
-    public static readonly Color Hover  = Color.FromArgb(48, 48, 48);
-    public static readonly Color Border = Color.FromArgb(58, 58, 58);
-    public static readonly Color Text   = Color.FromArgb(228, 228, 228);
-    public static readonly Color Muted  = Color.FromArgb(135, 135, 135);
-    public static readonly Color Accent = Color.FromArgb(74, 158, 255);
+    public static readonly Color Bg     = Color.FromArgb(23, 25, 30);
+    public static readonly Color Panel  = Color.FromArgb(33, 36, 43);
+    public static readonly Color Hover  = Color.FromArgb(43, 47, 56);
+    public static readonly Color Border = Color.FromArgb(52, 57, 68);
+    public static readonly Color Text   = Color.FromArgb(230, 233, 240);
+    public static readonly Color Muted  = Color.FromArgb(138, 145, 160);
+    public static readonly Color Accent = Color.FromArgb(64, 148, 250);
+    public static readonly Color AccentHi = Color.FromArgb(92, 166, 255);
     public static readonly Color Ok     = Color.FromArgb(110, 200, 120);
+    public static readonly Color R      = Color.FromArgb(240, 112, 112);
+    public static readonly Color G      = Color.FromArgb(108, 200, 122);
+    public static readonly Color B      = Color.FromArgb(104, 158, 250);
 
     public static string Hex(Color c) { return string.Format("#{0:X2}{1:X2}{2:X2}", c.R, c.G, c.B); }
     public static Color Contrast(Color c) { return (c.R * 299 + c.G * 587 + c.B * 114) / 1000 > 150 ? Color.Black : Color.White; }
@@ -60,6 +64,7 @@ static class Theme
 
     public const TextFormatFlags Center = TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter;
     public const TextFormatFlags Left = TextFormatFlags.Left | TextFormatFlags.VerticalCenter;
+    public const TextFormatFlags Right = TextFormatFlags.Right | TextFormatFlags.VerticalCenter;
 }
 
 abstract class Painted : Control
@@ -84,12 +89,17 @@ class FlatButton : Painted
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics; g.Clear(BackColor); Theme.Smooth(g);
-        using (var p = Logo.RoundRect(new RectangleF(0.5f, 0.5f, Width - 1, Height - 1), 4))
+        using (var p = Logo.RoundRect(new RectangleF(0.5f, 0.5f, Width - 1, Height - 1), 5))
         {
-            using (var b = new SolidBrush(hover ? Theme.Hover : Theme.Panel)) g.FillPath(b, p);
-            using (var pen = new Pen(Active ? Theme.Accent : Theme.Border)) g.DrawPath(pen, p);
+            if (Active)
+            {
+                using (var b = new SolidBrush(Theme.Panel)) g.FillPath(b, p);
+                using (var pen = new Pen(Theme.Accent, 1.5f)) g.DrawPath(pen, p);
+            }
+            else
+                using (var b = new SolidBrush(hover ? Theme.AccentHi : Theme.Accent)) g.FillPath(b, p);
         }
-        TextRenderer.DrawText(g, Text, Font, ClientRectangle, Active ? Theme.Accent : Theme.Text, Theme.Center);
+        TextRenderer.DrawText(g, Text, Font, ClientRectangle, Active ? Theme.AccentHi : Color.White, Theme.Center);
     }
 }
 
@@ -101,7 +111,7 @@ class Swatch : Painted
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics; g.Clear(BackColor); Theme.Smooth(g);
-        using (var p = Logo.RoundRect(new RectangleF(0.5f, 0.5f, Width - 1, Height - 1), 4))
+        using (var p = Logo.RoundRect(new RectangleF(0.5f, 0.5f, Width - 1, Height - 1), 5))
         {
             if (C == null)
             {
@@ -112,7 +122,10 @@ class Swatch : Painted
             using (var b = new SolidBrush(C.Value)) g.FillPath(b, p);
             using (var pen = new Pen(Color.FromArgb(30, 255, 255, 255))) g.DrawPath(pen, p);
         }
-        TextRenderer.DrawText(g, Theme.Hex(C.Value), Mono, new Rectangle(10, 0, Width - 20, Height), Theme.Contrast(C.Value), Theme.Left);
+        Color c = C.Value, fg = Theme.Contrast(c);
+        TextRenderer.DrawText(g, Theme.Hex(c), Mono, new Rectangle(12, 0, Width - 24, Height), fg, Theme.Left);
+        TextRenderer.DrawText(g, string.Format("{0}, {1}, {2}", c.R, c.G, c.B), Font, new Rectangle(12, 0, Width - 24, Height),
+            Color.FromArgb(fg.R == 0 ? 90 : 200, fg.R == 0 ? 90 : 200, fg.R == 0 ? 90 : 200), Theme.Right);
     }
 }
 
@@ -120,21 +133,22 @@ class Swatch : Painted
 class FormatRow : Painted
 {
     public string Label;
+    public Color LabelColor = Theme.Muted;
     public bool Auto;
     public readonly TextBox Box;
     public event EventHandler CopyClick, AutoClick;
     bool hoverCopy, hoverDot, copied;
     readonly Timer reset = new Timer { Interval = 1200 };
 
-    Rectangle DotRect  { get { return new Rectangle(2, (Height - 8) / 2, 8, 8); } }
-    Rectangle DotHit   { get { return new Rectangle(0, 0, 16, Height); } }
-    Rectangle CopyRect { get { return new Rectangle(Width - 48, 2, 48, Height - 4); } }
+    Rectangle DotRect  { get { return new Rectangle(3, (Height - 9) / 2, 9, 9); } }
+    Rectangle DotHit   { get { return new Rectangle(0, 0, 18, Height); } }
+    Rectangle CopyRect { get { return new Rectangle(Width - 56, 3, 56, Height - 6); } }
 
     public FormatRow()
     {
-        Height = 24;
+        Height = 28;
         Box = new TextBox { BorderStyle = BorderStyle.None, ReadOnly = true, BackColor = Theme.Bg,
-                            ForeColor = Theme.Text, Font = new Font("Consolas", 9.5f), TabStop = false };
+                            ForeColor = Theme.Text, Font = new Font("Consolas", 10f), TabStop = false };
         Controls.Add(Box);
         reset.Tick += delegate { reset.Stop(); copied = false; Invalidate(); };
     }
@@ -143,8 +157,8 @@ class FormatRow : Painted
     {
         base.OnLayout(e);
         if (Box == null) return;
-        Box.Location = new Point(84, (Height - Box.Height) / 2 + 1);
-        Box.Width = Width - 84 - 52;
+        Box.Location = new Point(96, (Height - Box.Height) / 2 + 1);
+        Box.Width = Width - 96 - 60;
     }
 
     public void Flash() { copied = true; Invalidate(); reset.Stop(); reset.Start(); }
@@ -170,13 +184,14 @@ class FormatRow : Painted
         if (Auto) using (var b = new SolidBrush(Theme.Accent)) g.FillEllipse(b, dr);
         else using (var pen = new Pen(hoverDot ? Theme.Muted : Theme.Border)) g.DrawEllipse(pen, dr);
 
-        TextRenderer.DrawText(g, Label, Font, new Rectangle(16, 0, 66, Height), Theme.Muted, Theme.Left);
+        TextRenderer.DrawText(g, Label, Font, new Rectangle(20, 0, 76, Height), LabelColor, Theme.Left);
 
         var cr = CopyRect;
-        if (hoverCopy && !copied)
-            using (var p = Logo.RoundRect(cr, 3)) using (var b = new SolidBrush(Theme.Hover)) g.FillPath(b, p);
+        using (var p = Logo.RoundRect(cr, 4))
+        using (var b = new SolidBrush(hoverCopy && !copied ? Theme.Hover : Theme.Panel))
+            g.FillPath(b, p);
         TextRenderer.DrawText(g, copied ? "copied" : "copy", Font, cr,
-            copied ? Theme.Ok : hoverCopy ? Theme.Text : Theme.Muted, Theme.Center);
+            copied ? Theme.Ok : hoverCopy ? Theme.AccentHi : Theme.Muted, Theme.Center);
     }
 }
 
@@ -185,7 +200,7 @@ class Chips : Painted
     public readonly List<Color> Items = new List<Color>();
     public event Action<Color> ChipClick;
     int hover = -1;
-    const int S = 20, G = 4, Max = 10;
+    const int S = 24, G = 4, Max = 10;
 
     Rectangle ChipRect(int i) { return new Rectangle(1 + i * (S + G), (Height - S) / 2, S, S); }
     public void Add(Color c) { Items.Insert(0, c); if (Items.Count > Max) Items.RemoveAt(Max); Invalidate(); }
@@ -214,7 +229,7 @@ class Chips : Painted
             return;
         }
         for (int i = 0; i < Items.Count; i++)
-            using (var p = Logo.RoundRect(ChipRect(i), 3))
+            using (var p = Logo.RoundRect(ChipRect(i), 4))
             {
                 using (var b = new SolidBrush(Items[i])) g.FillPath(b, p);
                 using (var pen = new Pen(i == hover ? Theme.Text : Theme.Border)) g.DrawPath(pen, p);
@@ -225,7 +240,7 @@ class Chips : Painted
 // Magnifier that follows the cursor while picking
 class Loupe : Form
 {
-    const int N = 11, Z = 9, Pad = 5, Info = 22;
+    const int N = 11, Z = 10, Pad = 5, Info = 22;
     readonly Bitmap cap = new Bitmap(N, N, PixelFormat.Format32bppRgb);
     Color center;
     readonly Font mono = new Font("Consolas", 8.5f);
@@ -296,7 +311,7 @@ class Loupe : Form
         using (var pen = new Pen(Theme.Border)) g.DrawRectangle(pen, chip);
         TextRenderer.DrawText(g, Theme.Hex(center), mono, new Rectangle(Pad + 16, iy, Width, 16), Theme.Text, Theme.Left);
 
-        using (var pen = new Pen(Theme.Border)) g.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
+        using (var pen = new Pen(Theme.Accent)) g.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
     }
 }
 
@@ -341,38 +356,41 @@ class ColorPicker : Form
         TopMost = true;
         BackColor = Theme.Bg;
         ForeColor = Theme.Text;
-        Font = new Font("Segoe UI", 9f);
+        Font = new Font("Segoe UI", 9.75f);
         DoubleBuffered = true;
         KeyPreview = true;
         try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
 
-        const int X = 12, W = 256;
-        int y = 12;
+        const int X = 14, W = 300;
+        int y = 14;
 
-        pickBtn = new FlatButton { Location = new Point(X, y), Size = new Size(W, 30) };
+        pickBtn = new FlatButton { Location = new Point(X, y), Size = new Size(W, 36), Font = new Font("Segoe UI Semibold", 9.75f) };
         pickBtn.Click += delegate { if (hook == IntPtr.Zero) StartPicking(); else StopPicking(); };
-        y += 40;
+        y += 46;
 
-        swatch = new Swatch { Location = new Point(X, y), Size = new Size(W, 48), Mono = new Font("Consolas", 13f) };
-        y += 56;
+        swatch = new Swatch { Location = new Point(X, y), Size = new Size(W, 62), Mono = new Font("Consolas", 15f) };
+        y += 72;
+
+        var labelColors = new[] { Theme.R, Theme.G, Theme.B };
 
         var tip = new ToolTip();
         for (int i = 0; i < rows.Length; i++)
         {
             int idx = i;
             var row = new FormatRow { Label = FormatNames[i], Location = new Point(X, y), Width = W, Auto = i == autoIdx };
+            if (i < 3) row.LabelColor = labelColors[i];
             row.CopyClick += delegate { if (swatch.C != null) { CopyText(Format(idx, swatch.C.Value)); row.Flash(); } };
             row.AutoClick += delegate { SetAuto(idx); };
             tip.SetToolTip(row, "Dot: copy this format automatically after each pick");
             rows[i] = row;
             Controls.Add(row);
-            y += 24;
+            y += 28;
         }
 
-        sepY = y + 6; y += 13;
-        chips = new Chips { Location = new Point(X, y), Size = new Size(W, 24) };
+        sepY = y + 8; y += 17;
+        chips = new Chips { Location = new Point(X, y), Size = new Size(W, 28) };
         chips.ChipClick += Display;
-        y += 24 + 10;
+        y += 28 + 12;
 
         Controls.Add(pickBtn);
         Controls.Add(swatch);
@@ -409,7 +427,7 @@ class ColorPicker : Form
     protected override void OnPaint(PaintEventArgs e)
     {
         base.OnPaint(e);
-        using (var pen = new Pen(Theme.Border)) e.Graphics.DrawLine(pen, 12, sepY, ClientSize.Width - 12, sepY);
+        using (var pen = new Pen(Theme.Border)) e.Graphics.DrawLine(pen, 14, sepY, ClientSize.Width - 14, sepY);
     }
 
     protected override void WndProc(ref Message m)
